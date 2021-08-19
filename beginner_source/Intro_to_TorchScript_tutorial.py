@@ -2,53 +2,52 @@
 Introduction to TorchScript
 ===========================
 
-*James Reed (jamesreed@fb.com), Michael Suo (suo@fb.com)*, rev2
+*James Reed (jamesreed@fb.com), Michael Suo (suo@fb.com)*, rev2  
 
-This tutorial is an introduction to TorchScript, an intermediate
-representation of a PyTorch model (subclass of ``nn.Module``) that
-can then be run in a high-performance environment such as C++.
+**번역** : `김태영<https://github.com/Taeyoung96>`
 
-In this tutorial we will cover:
+이 튜토리얼은 C++와 같은 고성능 환경에서 실행할 수 있는   
+Pytorch 모델(``nn.Module``의 하위클래스)의 중간 표현 방식인 TorchScript에 대한 소개입니다.
 
-1. The basics of model authoring in PyTorch, including:
 
--  Modules
--  Defining ``forward`` functions
--  Composing modules into a hierarchy of modules
+이 튜토리얼에서 우리는 다음과 같은 내용을 다룹니다:
 
-2. Specific methods for converting PyTorch modules to TorchScript, our
-   high-performance deployment runtime
+1. Pytorch에서 모델을 만들 때 기초가 되는 것들:  
 
--  Tracing an existing module
--  Using scripting to directly compile a module
--  How to compose both approaches
--  Saving and loading TorchScript modules
+-  모듈들 (Modules)
+-  ``forward``함수를 정의  
+-  모듈을 계층 구조로 구성
 
-We hope that after you complete this tutorial, you will proceed to go through
-`the follow-on tutorial <https://pytorch.org/tutorials/advanced/cpp_export.html>`_
-which will walk you through an example of actually calling a TorchScript
-model from C++.
+2. Pytorch 모듈들을 우리의 고성능 배포 런타임인 TorchSript로 변환하는 구체적인 방법들
+
+-  기존 모듈 트레이싱(Tracing)하기
+-  스크립팅(Scripting)을 활용하여 모듈 직접 컴파일 하기  
+-  두 접근 방식을 모두 구성하는 방법  
+-  TorchScript 모듈들을 활용하여 저장하고 불러오기
+
+이 튜토리얼을 완료한 후에는 실제로 C++에서 TorchScript 모델을 불러오는 예제를 안내하는  
+`후속 튜토리얼<https://pytorch.org/tutorials/advanced/cpp_export.html>`_을 진행할 수 있습니다.
 
 """
 
-import torch  # This is all you need to use both PyTorch and TorchScript!
+import torch  # 이것은 PyTorch와 TorchSript를 사용할 때 꼭 필요로 합니다!
 print(torch.__version__)
 
 
 ######################################################################
-# Basics of PyTorch Model Authoring
+# PyTorch 모델을 만들 때 기초가 되는 것들
 # ---------------------------------
 #
-# Let’s start out be defining a simple ``Module``. A ``Module`` is the
-# basic unit of composition in PyTorch. It contains:
+# 간단한 ``Module``을 정의하는 것부터 시작하겠습니다.  
+# ``Module``은 PyTorch의 기본 구성 단위입니다.  
+# 다음과 같은 내용을 포함하고 있습니다.
 #
-# 1. A constructor, which prepares the module for invocation
-# 2. A set of ``Parameters`` and sub-\ ``Modules``. These are initialized
-#    by the constructor and can be used by the module during invocation.
-# 3. A ``forward`` function. This is the code that is run when the module
-#    is invoked.
+# 1. 호출이 일어날 때 모듈을 준비하는 생성자
+# 2. ``Parameters``와 하위 ``Modules``의 집합체.  
+#    이것들은 생성자를 통해 초기화되고 호출 중에 모듈에 의해 사용될 수 있습니다.
+# 3. ``forward`` 함수. 이것은 모듈이 호출될 때 실행되는 코드입니다.
 #
-# Let’s examine a small example:
+# 작은 예제로 시작해보겠습니다:
 #
 
 class MyCell(torch.nn.Module):
@@ -66,22 +65,20 @@ print(my_cell(x, h))
 
 
 ######################################################################
-# So we’ve:
+# 따라서 우리는 다음 작업을 수행했습니다:
 #
-# 1. Created a class that subclasses ``torch.nn.Module``.
-# 2. Defined a constructor. The constructor doesn’t do much, just calls
-#    the constructor for ``super``.
-# 3. Defined a ``forward`` function, which takes two inputs and returns
-#    two outputs. The actual contents of the ``forward`` function are not
-#    really important, but it’s sort of a fake `RNN
-#    cell <https://colah.github.io/posts/2015-08-Understanding-LSTMs/>`__–that
-#    is–it’s a function that is applied on a loop.
+# 1. ``torch.nn.Module``를 하위 클래스로 갖는 클래스를 만들었습니다.  
+# 2. 생성자를 정의 했습니다. 생성자는 많은 일을 하지 않고, ``super``로 생성자를 호출합니다.  
+# 3. 2개의 입력을 받아 2개의 출력을 반환하는 ``forward`` 함수를 정의해봅시다.  
+#    ``forward`` 함수의 실제 내용은 사실상 중요하지 않습니다만,  
+#    이것은 가짜 `RNN cell <https://colah.github.io/posts/2015-08-Understanding-LSTMs/>`입니다.  
+#    즉, 반복(Loop)에 적용되는 함수입니다.  
 #
-# We instantiated the module, and made ``x`` and ``h``, which are just 3x4
-# matrices of random values. Then we invoked the cell with
-# ``my_cell(x, h)``. This in turn calls our ``forward`` function.
+# 우리는 모듈을 생성하고, 3x4 크기의 무작위 값들로 이루어진 행렬 ``x``와 ``h``를 만들었습니다.  
+# 그리고 우리는 ``my_cell(x, h)`` 를 이용해 cell을 호출했습니다.  
+# 이것은 우리의 ``forward`` 함수를 차례로 호출합니다.
 #
-# Let’s do something a little more interesting:
+# 좀 더 흥미로운 일을 진행해봅시다:
 #
 
 class MyCell(torch.nn.Module):
